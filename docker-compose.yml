@@ -1,0 +1,48 @@
+version: '3'
+
+services:
+  traefik:
+    image: traefik:v1.7.16
+    restart: always
+    ports:
+      - 443:443
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./traefik_config/traefik.toml:/traefik.toml
+      - ./traefik_config/acme.json:/acme.json
+    labels:
+      - "traefik.enable=true"
+      - "traefik.backend=proxy"
+      - "traefik.docker.network=web"
+      - "traefik.frontend.rule=Host:t${SUBDOMAIN}.${DOMAIN_NAME}"
+      - "traefik.port=8080"
+    networks:
+      - web
+
+  n8n:
+    image: n8nio/n8n
+    labels:
+      - "traefik.enable=true"
+      - "traefik.backend=api"
+      - "traefik.docker.network=web"
+      - "traefik.frontend.rule=Host:${SUBDOMAIN}.${DOMAIN_NAME}"
+      - "traefik.port=5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER
+      - N8N_BASIC_AUTH_PASSWORD
+      - N8N_HOST=${SUBDOMAIN}.${DOMAIN_NAME}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=https
+      - NODE_ENV=production
+      - WEBHOOK_TUNNEL_URL=https://${SUBDOMAIN}.${DOMAIN_NAME}/
+      - VUE_APP_URL_BASE_API=https://${SUBDOMAIN}.${DOMAIN_NAME}/
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${DATA_FOLDER}/.n8n:/root/.n8n
+    networks:
+      - web
+
+networks:
+  web:
+    external: true
